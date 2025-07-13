@@ -1,0 +1,279 @@
+@{
+    ViewData["Title"] = "Buscar Empleado";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <input type="text" id="busqueda" class="form-control" placeholder="Buscar por nombre o código..." />
+    </div>
+    <div class="col-md-3">
+        <select id="filtroPuesto" class="form-select">
+            <option value="">-- Filtrar por Puesto --</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <input type="number" id="filtroJefe" class="form-control" placeholder="Código del jefe" />
+    </div>
+    <div class="col-md-2 d-grid">
+        <button class="btn btn-success" id="btnNuevo"><i class="bi bi-person-plus-fill"></i> Nuevo Empleado</button>
+</svg>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-hover" id="tablaResultados">
+        <thead class="table-light">
+            <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Puesto</th>
+                <th>Jefe</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div class="d-flex justify-content-between mt-3">
+    <button class="btn btn-outline-secondary" id="btnAnterior">⬅️ Anterior</button>
+    <button class="btn btn-outline-secondary" id="btnSiguiente">Siguiente ➡️</button>
+</div>
+
+<!-- Modal CRUD -->
+<div class="modal fade" id="editarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form id="formEmpleado">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Empleado</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="codigo" />
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="nombre" required />
+                         <div class="invalid-feedback">El nombre es obligatorio.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Puesto</label>
+                        <select class="form-select" id="codigoPuesto" required>
+                            <option value="">-- Seleccione Puesto --</option>
+                        </select>
+                         <div class="invalid-feedback">Debe seleccionar un puesto.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Código Jefe</label>
+                        <input type="number" class="form-control" id="codigoJefe" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle"></i> Cancelar</button>
+                    <button type="submit" class="btn btn-primary d-none" id="btnGuardarNuevo"><i class="bi bi-save"></i> Guardar</button>
+                    <button type="submit" class="btn btn-warning d-none" id="btnGuardarEditar"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let currentPage = 1;
+    const pageSize = 20;
+    const modal = new bootstrap.Modal(document.getElementById('editarModal'));
+    let catalogoPuestos = [];
+
+    async function cargarCatalogoPuestos() {
+        const res = await fetch('/api/catalogo/1');
+        catalogoPuestos = await res.json();
+
+        const selectFiltro = $('#filtroPuesto');
+        selectFiltro.empty().append(`<option value="">-- Filtrar por Puesto --</option>`);
+        catalogoPuestos.forEach(p => {
+            selectFiltro.append(`<option value="${p.codigo}">${p.nombre}</option>`);
+        });
+
+        const selectModal = $('#codigoPuesto');
+        selectModal.empty().append(`<option value="">-- Seleccione Puesto --</option>`);
+        catalogoPuestos.forEach(p => {
+            selectModal.append(`<option value="${p.codigo}">${p.nombre}</option>`);
+        });
+    }
+
+    function nombrePuesto(codigoPuesto) {
+        const puesto = catalogoPuestos.find(p => p.codigo === codigoPuesto);
+        return puesto ? puesto.nombre : '(sin puesto)';
+    }
+
+    async function cargarResultados() {
+        const search = $('#busqueda').val();
+        const puesto = $('#filtroPuesto').val();
+        const jefeVal = $('#filtroJefe').val();
+        const jefe = jefeVal === "" ? null : jefeVal;
+
+        const query = new URLSearchParams({
+            search, page: currentPage, pageSize, puesto, jefeId: jefe
+        });
+
+        const res = await fetch(`/api/empleados?${query}`);
+        const result = await res.json();
+        const empleados = result.data;
+
+        const tbody = $('#tablaResultados tbody');
+        tbody.empty();
+
+        empleados.forEach(emp => {
+            const nombreDelPuesto = nombrePuesto(emp.codigoPuesto);
+            const nombreJefe = empleados.find(e => e.codigo === emp.codigoJefe)?.nombre || '-';
+
+            tbody.append(`
+                <tr>
+                    <td>${emp.codigo}</td>
+                    <td>${emp.nombre}</td>
+                    <td>${nombreDelPuesto}</td>
+                    <td>${nombreJefe}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary btn-editar" data-id="${emp.codigo}"><i class="bi bi-pencil-fill"></i></button>
+                        <button class="btn btn-sm btn-danger btn-eliminar" data-id="${emp.codigo}"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+            `);
+        });
+    }
+
+    function mostrarBoton(accion) {
+        if (accion === 'nuevo') {
+            $('#btnGuardarNuevo').removeClass('d-none');
+            $('#btnGuardarEditar').addClass('d-none');
+        } else {
+            $('#btnGuardarNuevo').addClass('d-none');
+            $('#btnGuardarEditar').removeClass('d-none');
+        }
+    }
+
+    $('#btnNuevo').on('click', function () {
+        $('#formEmpleado')[0].reset();
+        $('#codigo').val('');
+        $('#codigoPuesto').val('');
+        mostrarBoton('nuevo');
+        modal.show();
+    });
+
+    $(document).on('click', '.btn-editar', async function () {
+        const id = $(this).data('id');
+        const emp = await fetch(`/api/empleados/${id}`).then(r => r.json());
+
+        $('#codigo').val(emp.codigo);
+        $('#nombre').val(emp.nombre);
+        $('#codigoPuesto').val(emp.codigoPuesto);
+        $('#codigoJefe').val(emp.codigoJefe ?? '');
+
+        mostrarBoton('editar');
+        modal.show();
+    });
+
+    $(document).on('click', '.btn-eliminar', function () {
+        const id = $(this).data('id');
+        if (confirm('¿Eliminar este empleado?')) {
+            fetch(`/api/empleados/${id}`, { method: 'DELETE' })
+                .then(() => cargarResultados());
+        }
+    });
+
+    $('#btnGuardarNuevo').on('click', async function (e) {
+        e.preventDefault();
+    if (!validarFormulario()) return;
+        const emp = {
+            nombre: $('#nombre').val(),
+            codigoPuesto: parseInt($('#codigoPuesto').val()),
+            codigoJefe: $('#codigoJefe').val() || null
+        };
+
+        await fetch(`/api/empleados`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emp)
+        });
+
+        modal.hide();
+        await cargarResultados();
+    });
+
+    $('#btnGuardarEditar').on('click', async function (e) {
+        e.preventDefault();
+    if (!validarFormulario()) return;
+        const codigo = $('#codigo').val();
+        const emp = {
+            codigo: parseInt(codigo),
+            nombre: $('#nombre').val(),
+            codigoPuesto: parseInt($('#codigoPuesto').val()),
+            codigoJefe: $('#codigoJefe').val() || null
+        };
+
+        await fetch(`/api/empleados/${codigo}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emp)
+        });
+
+        modal.hide();
+        await cargarResultados();
+    });
+
+    $('#busqueda, #filtroPuesto, #filtroJefe').on('input change', function () {
+        currentPage = 1;
+        cargarResultados();
+    });
+
+    $('#btnAnterior').on('click', function () {
+        if (currentPage > 1) {
+            currentPage--;
+            cargarResultados();
+        }
+    });
+
+    $('#btnSiguiente').on('click', function () {
+        currentPage++;
+        cargarR
+        esultados();
+    });
+    function validarFormulario() {
+    let esValido = true;
+
+    const nombre = $('#nombre');
+    const puesto = $('#codigoPuesto');
+
+    // Validar nombre
+    if (nombre.val().trim() === '') {
+        nombre.addClass('is-invalid');
+        esValido = false;
+    } else {
+        nombre.removeClass('is-invalid');
+    }
+
+    // Validar puesto
+    if (!puesto.val()) {
+        puesto.addClass('is-invalid');
+        esValido = false;
+    } else {
+        puesto.removeClass('is-invalid');
+    }
+
+    return esValido;
+}
+
+    document.getElementById('editarModal').addEventListener('hidden.bs.modal', function () {
+        $('#formEmpleado')[0].reset();
+        $('#codigo').val('');
+        $('#codigoPuesto').val('');
+        $('#btnGuardarNuevo').addClass('d-none');
+        $('#btnGuardarEditar').addClass('d-none');
+    });
+
+    cargarCatalogoPuestos().then(() => cargarResultados());
+</script>
+}

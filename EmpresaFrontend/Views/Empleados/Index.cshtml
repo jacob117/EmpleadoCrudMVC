@@ -1,0 +1,36 @@
+﻿@model List<EmpresaFrontend.Models.Empleado>
+
+@{
+    ViewData["Title"] = "Jerarquía de Empleados";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="tree-view">
+    <ul class="list-unstyled">
+        @foreach (var emp in Model)
+        {
+           <partial name="_EmpleadoNode" model="emp" />
+
+        }
+    </ul>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('.toggle-node').on('click', function () {
+                const icon = $(this).find('i');
+                const subtree = $(this).closest('li').find('> ul.subtree');
+
+                if (subtree.hasClass('d-none')) {
+                    subtree.removeClass('d-none');
+                    icon.removeClass('fa-plus-square').addClass('fa-minus-square');
+                } else {
+                    subtree.addClass('d-none');
+                    icon.removeClass('fa-minus-square').addClass('fa-plus-square');
+                }
+            });
+        });
+    </script>
+}

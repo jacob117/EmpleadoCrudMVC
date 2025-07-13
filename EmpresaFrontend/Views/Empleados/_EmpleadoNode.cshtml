@@ -1,0 +1,31 @@
+@model EmpresaFrontend.Models.Empleado
+
+<li>
+    <div class="d-flex align-items-center">
+        @if (Model.Subordinados.Any())
+        {
+            <span class="toggle-node me-2" style="cursor:pointer;">
+                <i class="fas fa-plus-square text-primary"></i>
+            </span>
+        }
+        else
+        {
+            <span class="me-2" style="width: 16px;"></span>
+        }
+
+        <span>@Model.Codigo - <strong>@Model.Puesto</strong> - @Model.Nombre</span>
+    </div>
+
+    @if (Model.Subordinados.Any())
+    {
+        <ul class="subtree list-unstyled ms-4 d-none">
+            @foreach (var sub in Model.Subordinados)
+            {
+                <partial name="_EmpleadoNode" model="sub" />
+
+            }
+        </ul>
+    }
+</li>
+
+
